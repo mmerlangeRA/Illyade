@@ -14,8 +14,8 @@ def get_ANO_per_Installation(installation,df_aggregated):
 def plot_maxPA_maxPM_per_date_for_installation(df, installation,saveName=""):
     df_filtered = df[df['Installation'] == installation]
     plt.figure(figsize=(10, 6))
-    plt.plot(df_filtered['month'], df_filtered['maxPA'], marker='o', linestyle='-', label='maxPA')
-    plt.plot(df_filtered['month'], df_filtered['maxPS'], marker='x', linestyle='--', label='maxPS')
+    plt.plot(df_filtered['month'], df_filtered['PAInstallationMonth'], marker='o', linestyle='-', label='maxPA')
+    plt.plot(df_filtered['month'], df_filtered['PSInstallationMonth'], marker='x', linestyle='--', label='maxPS')
 
     # Formatting the plot
     plt.title(f'maxPA and maxPS per Month for Installation {installation}')
@@ -108,6 +108,28 @@ def get_information_from_cluster(pa_df, cluster_id,pd_naf):
     st.dataframe(region_common)
     plot_centroid(cluster_id, filtered_columns, centroids_original_scale)
 
+def filter_installations_by_distance(filter_choice, cluster_installations, pivot_data, confidence_level=0.5):
+    # Filter based on SignedMaxDistance
+    if filter_choice == 'Positive':
+        condition = pivot_data['SignedMaxDistance'] > confidence_level
+    elif filter_choice == 'Negative':
+        condition = pivot_data['SignedMaxDistance'] < -confidence_level
+    else:
+        condition =pivot_data['MaxDistance'] > confidence_level  # All rows are valid if "Both" is selected
+
+    # Apply filter condition
+    filtered_installations = cluster_installations[cluster_installations.isin(pivot_data[condition].index)]
+
+    # Sort these filtered installations by 'MaxDistance' descending
+    if not filtered_installations.empty:
+        # Get the 'MaxDistance' for these installations from pivot_data
+        max_distances = pivot_data.loc[filtered_installations, 'MaxDistance']
+        # Sort by 'MaxDistance' in descending order
+        filtered_installations = max_distances.sort_values(ascending=False).index
+
+    return filtered_installations
+
+
 
 # Load data
 @st.cache_data
@@ -117,7 +139,7 @@ def load_data():
     df_pa_ps = pd.read_csv('PA_PS_Installation.csv')
     pivot_outliers = pd.read_csv('pivot_ouliers.csv',index_col="Installation")
     pivot_outliers = pivot_outliers.sort_values(by='MaxDistance', ascending=False)
-    centroids_original_scale = np.load('centroids_original_scale.npy')
+    centroids_original_scale = np.load('agg_centroids_original_scale.npy')
     pd_naf = pd.read_csv('code_naf.csv')
     print("all loaded")
     return df_aggregated, df_cluster, df_pa_ps, pivot_outliers,centroids_original_scale,pd_naf
@@ -137,8 +159,9 @@ st.write(f'Number of unique installations: {unique_installations}')
 st.write(f'Number of unique clusters: {unique_clusters}')
 
 # Number of installations per cluster
-cluster_counts = df_cluster['cluster'].value_counts().sort_values()
+cluster_counts = df_cluster['cluster'].value_counts()#.sort_values()
 cluster_options = [(index, count) for index, count in cluster_counts.items()]
+cluster_options.sort(key=lambda x: x[0])  # Sort by count in descending order
 cluster_options.insert(0, ('All', 'All'))  # Insert 'All' option at the beginning
 cluster_selection = st.selectbox(
     'Select a cluster',
@@ -153,45 +176,25 @@ selected_cluster_installations = get_installations_based_on_cluster_selection(cl
 if st.button('Show Cluster Info'):
     get_information_from_cluster(df_aggregated, cluster_selection[0],pd_naf)
 
+confidence_level = st.slider('Select Confidence Level', min_value=0.0, max_value=1.0, value=0.5, step=0.01)
+
 distance_filter = st.radio(
     "Filter installations by SignedMaxDistance:",
     ('Positive', 'Negative', 'Both')
 )
 
-def filter_installations_by_distance(filter_choice, cluster_installations, pivot_data):
-    # Filter based on SignedMaxDistance
-    if filter_choice == 'Positive':
-        condition = pivot_data['SignedMaxDistance'] > 0
-    elif filter_choice == 'Negative':
-        condition = pivot_data['SignedMaxDistance'] < 0
-    else:
-        condition = pd.Series(True, index=pivot_data.index)  # All rows are valid if "Both" is selected
-
-    # Apply filter condition
-    filtered_installations = cluster_installations[cluster_installations.isin(pivot_data[condition].index)]
-
-    # Sort these filtered installations by 'MaxDistance' descending
-    if not filtered_installations.empty:
-        # Get the 'MaxDistance' for these installations from pivot_data
-        max_distances = pivot_data.loc[filtered_installations, 'MaxDistance']
-        # Sort by 'MaxDistance' in descending order
-        filtered_installations = max_distances.sort_values(ascending=False).index
-
-    return filtered_installations
-
-
-
 # Assuming selected_cluster_installations is already filtered to the selected cluster
 selected_cluster_installations = filter_installations_by_distance(
-    distance_filter, selected_cluster_installations, pivot_outliers
+    distance_filter, selected_cluster_installations, pivot_outliers,confidence_level
 )
+st.write(f'Nb likely anomalies {len(selected_cluster_installations)}')
 # Dropdown for installations within the selected cluster
 dropdown_options = {}
 for installation in selected_cluster_installations.unique():
     if installation in pivot_outliers.index:
         max_distance = pivot_outliers.loc[installation, 'SignedMaxDistance']
         # Format the string as "Installation - SignedMaxDistance"
-        option_label = f"{installation} - {max_distance}"
+        option_label = f"{installation} Distance: {max_distance}"
         dropdown_options[option_label] = installation
 
 # Create the dropdown in Streamlit
