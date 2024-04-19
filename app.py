@@ -3,6 +3,28 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import requests
+import io
+
+
+web_url = "https://nemato-data.fr/illiade/" # or ""
+
+def load_npy_from_url(url):
+    # Send a GET request to the URL
+    response = requests.get(url)
+    
+    # Ensure the request was successful
+    if response.status_code == 200:
+        # Use io.BytesIO to create a file-like object from the response content
+        file_like_object = io.BytesIO(response.content)
+        
+        # Load the .npy file content into a NumPy array
+        array = np.load(file_like_object)
+        return array
+    else:
+        raise Exception(f"Failed to download the file: HTTP {response.status_code}")
+
+
 
 def get_ANO_per_Installation(installation,df_aggregated):
     filtered_df = df_aggregated[df_aggregated['Installation']==installation & df_aggregated['Num_ANO'].notna()]
@@ -134,13 +156,16 @@ def filter_installations_by_distance(filter_choice, cluster_installations, pivot
 # Load data
 @st.cache_data
 def load_data():
-    df_aggregated = pd.read_csv('Installation_PA_PS_ANO.csv')
-    df_cluster = pd.read_csv('installation_cluster.csv')
-    df_pa_ps = pd.read_csv('PA_PS_Installation.csv')
-    pivot_outliers = pd.read_csv('pivot_ouliers.csv',index_col="Installation")
+    df_aggregated = pd.read_csv(web_url+'Installation_PA_PS_ANO.csv')
+    df_cluster = pd.read_csv(web_url+'installation_cluster.csv')
+    df_pa_ps = pd.read_csv(web_url+'PA_PS_Installation.csv')
+    pivot_outliers = pd.read_csv(web_url+'pivot_ouliers.csv',index_col="Installation")
     pivot_outliers = pivot_outliers.sort_values(by='MaxDistance', ascending=False)
-    centroids_original_scale = np.load('agg_centroids_original_scale.npy')
-    pd_naf = pd.read_csv('code_naf.csv')
+    if web_url != "":
+        centroids_original_scale = load_npy_from_url(web_url+'agg_centroids_original_scale.npy')
+    else:
+        centroids_original_scale = np.load('agg_centroids_original_scale.npy')
+    pd_naf = pd.read_csv(web_url+'code_naf.csv')
     print("all loaded")
     return df_aggregated, df_cluster, df_pa_ps, pivot_outliers,centroids_original_scale,pd_naf
 
