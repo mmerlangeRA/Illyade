@@ -7,7 +7,9 @@ import requests
 import io
 
 
-web_url = "https://nemato-data.fr/illiade/" # or ""
+web_url = ""#"https://nemato-data.fr/illiade/" # or ""
+
+max_deviance=10
 
 def load_npy_from_url(url):
     # Send a GET request to the URL
@@ -157,14 +159,14 @@ def filter_installations_by_distance(filter_choice, cluster_installations, pivot
 @st.cache_data
 def load_data():
     df_aggregated = pd.read_csv(web_url+'Installation_PA_PS_ANO.csv')
-    df_cluster = pd.read_csv(web_url+'installation_cluster.csv')
+    df_cluster = pd.read_csv(web_url+'installation_cluster_'+str(max_deviance)+'.csv')
     df_pa_ps = pd.read_csv(web_url+'PA_PS_Installation.csv')
-    pivot_outliers = pd.read_csv(web_url+'pivot_ouliers.csv',index_col="Installation")
+    pivot_outliers = pd.read_csv(web_url+'pivot_ouliers_'+str(max_deviance)+'.csv',index_col="Installation")
     pivot_outliers = pivot_outliers.sort_values(by='MaxDistance', ascending=False)
     if web_url != "":
-        centroids_original_scale = load_npy_from_url(web_url+'agg_centroids_original_scale.npy')
+        centroids_original_scale = load_npy_from_url(web_url+'agg_centroids_original_scale_'+str(max_deviance)+'.npy')
     else:
-        centroids_original_scale = np.load('agg_centroids_original_scale.npy')
+        centroids_original_scale = np.load('agg_centroids_original_scale_'+str(max_deviance)+'.npy')
     pd_naf = pd.read_csv(web_url+'code_naf.csv')
     print("all loaded")
     return df_aggregated, df_cluster, df_pa_ps, pivot_outliers,centroids_original_scale,pd_naf
@@ -181,7 +183,7 @@ unique_installations = len(df_aggregated['Installation'].unique())
 unique_clusters = len(df_cluster['cluster'].unique())
 st.header(f'Summary')
 st.write(f'Number of unique installations: {unique_installations}')
-st.write(f'Number of unique clusters: {unique_clusters}')
+st.write(f'Number of unique clusters: {unique_clusters}, max deviance is {max_deviance}')
 
 # Number of installations per cluster
 cluster_counts = df_cluster['cluster'].value_counts()#.sort_values()

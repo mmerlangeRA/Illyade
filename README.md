@@ -9,3 +9,7 @@
 * source venv/bin/activate
 * pip install requirements.txt
 * streamlit run app.py
+
+## 13 mai
+Multiple test with Agglomerative clustering : variance
+
