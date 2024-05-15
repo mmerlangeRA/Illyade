@@ -11,5 +11,4 @@
 * streamlit run app.py
 
 ## 13 mai
-Multiple test with Agglomerative clustering : variance
-
+* first tests using Configurations for NAF/Region
